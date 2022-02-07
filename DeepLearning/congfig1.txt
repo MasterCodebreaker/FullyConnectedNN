@@ -1,0 +1,11 @@
+# "cross_entropy_loss" "MSE" "difference"
+loss_function="MSE"
+# make network
+learning_rate = 1
+epochs = 80
+batch_size = 10
+stochastic = True
+softmax = True
+networkshape = [n ** 2, 4]
+# "sigmoid" "ReLU" "identity"
+actfunc = "ReLU"

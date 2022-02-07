@@ -186,17 +186,18 @@ class DataGenerator:
 if __name__ == "__main__":
     d = {0: "rectangle", 1: "cross", 2: "circle", 3: "triangle"}
     n = 50
-    gen = DataGenerator(n, 500, 10, True)
+    gen = DataGenerator(n, 500, 10, False)
     gen.generate()
     y = gen.Y
     unique, counts = np.unique(y, return_counts=True)
     print(dict(zip(d.values(), counts)))
     # PLotter
-    for i in range(5):
+    fig = plt.figure(figsize=(20, 20))
+    for i in range(10):
         title = d[int(y[i])]
         a = gen.Xmatrix[i]
-        fig = plt.figure(figsize=(10, 10))
-        fig.add_subplot()
+        fig.add_subplot(1 + 1 * (i > 4), 5, 1 + (i % 5))
         plt.title(title)
         plt.imshow(a, cmap=plt.cm.gray)
-        plt.show()
+    plt.show(block=True)
+    # plt.show()

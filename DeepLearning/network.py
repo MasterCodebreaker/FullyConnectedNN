@@ -61,7 +61,7 @@ class Network:
 
         # Make list of layers
         for i in range(1, len(self.networkshape) + self.softmax):
-            print(f"making layer {i}")
+            # print(f"making layer {i}")
             output_layer = False
             if i == len(self.networkshape) + self.softmax - 1:
                 output_layer = True
@@ -81,19 +81,19 @@ class Network:
 
     # Loss loss_function
     def loss_fun(self, outputs, targets) -> float:
-        if loss_function == "cross_entropy_loss":
+        if self.loss_function == "cross_entropy_loss":
             return cross_entropy_loss(outputs, targets)
-        elif loss_function == "MSE":
+        elif self.loss_function == "MSE":
             return mse(outputs, targets)
-        elif loss_function == "difference":
+        elif self.loss_function == "difference":
             return difference(outputs, targets)
 
     def d_loss_fun(self, outputs, targets):
-        if loss_function == "cross_entropy_loss":
+        if self.loss_function == "cross_entropy_loss":
             return d_cross_entropy_loss(outputs, targets)
-        elif loss_function == "MSE":
+        elif self.loss_function == "MSE":
             return d_mse(outputs, targets)
-        elif loss_function == "difference":
+        elif self.loss_function == "difference":
             return d_difference(outputs, targets)
 
     def forward(
@@ -217,89 +217,3 @@ class Network:
         )
 
         return outputs.round(1)
-
-
-"""
-TODO Skjekk at matten stemmer, skjekk mot Y_Val og sånn, no skejker du mot Y Train
-
-"""
-if __name__ == "__main__":
-    # Generate Data
-    n = 20
-    data = DataGenerator(dimension=n, size=1000, noise=0, center=False)
-    data.generate()
-    X_train = data.X_train
-    Y_train = one_hot_encode(data.Y_train, 4)
-    X_val = data.X_val
-    Y_val = one_hot_encode(data.Y_val, 4)
-    X_test = data.X_test
-    Y_test = one_hot_encode(data.Y_test, 4)
-    print(
-        f"Generating Data\nTraining data X = {X_train.shape}, Y = {Y_train.shape} \nValidating data X = {X_val.shape}, Y = {Y_val.shape}."
-    )
-    # "cross_entropy_loss" "MSE" "difference"
-    loss_function = "MSE"
-    # make network
-    learning_rate = 1
-    epochs = 80
-    batch_size = 10
-    stochastic = True
-    softmax = True
-    networkshape = [n ** 2, 4]
-    # "sigmoid" "ReLU" "identity"
-    actfunc = "ReLU"
-    print(
-        f"Making network: networkshape = {networkshape}, softmax = {softmax}, actfunc = {actfunc}, loss_function = {loss_function}."
-    )
-    net = Network(
-        networkshape=networkshape,
-        softmax=softmax,
-        actfunc=actfunc,
-        loss_function=loss_function,
-    )
-    # Train it
-    print(
-        f"Training network: learning_rate = {learning_rate}, epochs = {epochs}, batch_size = {batch_size}, stochastic = {stochastic}"
-    )
-    net.train(
-        learning_rate=learning_rate,
-        epochs=epochs,
-        batch_size=batch_size,
-        stochastic=stochastic,
-        X_train=X_train,
-        Y_train=Y_train,
-        X_val=X_val,
-        Y_val=Y_val,
-    )
-    print(
-        "Example prediction",
-        net.predict(X_val, Y_val, X_train, Y_train, X_test, Y_test)[0],
-    )
-
-    """
-    number_in_val = 10
-    val_set_X = np.array([X_val[i] for i in range(number_in_val)])
-    val_set_Y = np.array([Y_val[i] for i in range(number_in_val)])
-
-    X = np.array([X_val[0]])
-
-    result = net.predict(val_set_X, val_set_Y)
-    print(result, "\n", val_set_Y)
-
-    """
-    """
-    # Print weights
-    net.getweights()
-    X = net.endweights[1]
-    Y = X[:100, 0]
-    print(Y.shape, "Here")
-    a = X
-    # a = np.reshape(Y, (5, 4))
-    print(a)
-    """
-    """
-    fig = plt.figure(figsize=(10, 10))
-    fig.add_subplot()
-    plt.imshow(a, cmap=plt.cm.gray)
-    plt.show()
-    """
