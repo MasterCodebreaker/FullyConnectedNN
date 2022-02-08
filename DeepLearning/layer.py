@@ -23,13 +23,18 @@ from utils import (
 class Layer:
     def __init__(
         self,
+        reg_const: float,
+        reg: str,
         loss_function: str,
         n_prev_layer: int,
         n_this_layer: int,
         actfunc: str = "sigmoid",
         output_layer: bool = False,
         softmax: bool = False,
+        weight_range=(0, 1),
     ) -> None:
+        self.reg_const = reg_const
+        self.reg = reg
         self.softmax = softmax
         self.loss_function = loss_function
         self.output_layer = output_layer
@@ -45,10 +50,11 @@ class Layer:
             self.weights = np.eye(n_prev_layer - 1, n_prev_layer - 1)
             # Add zero row to kll "Bias trick"
             self.weights = np.r_[self.weights, np.zeros((1, self.weights.shape[1]))]
-            # print("We make a softmax layer")
             self.actfunc = "softmax"
         else:
-            self.weights = np.random.rand(n_prev_layer, n_this_layer)
+            self.weights = np.random.uniform(
+                weight_range[0], weight_range[1], (n_prev_layer, n_this_layer)
+            )
             self.actfunc = actfunc
             self.delta = np.zeros_like(self.weights)
 
@@ -73,15 +79,21 @@ class Layer:
         elif self.actfunc == "identity":
             return d_identity(z)
 
+    """
     def loss_fun(self, outputs, targets) -> float:
+        r = 0
+        if self.reg_const != 0:
+            if self.reg == "L1":
+                r = self.reg_const * np.einsum("ij ->", np.abs(self.weights))
+            elif self.reg == "L2":
+                r = self.reg_const * np.einsum("ij ->", self.weights ** 2) * (1 / 2)
         if self.loss_function == "cross_entropy_loss":
-            return cross_entropy_loss(outputs, targets)
+            return cross_entropy_loss(outputs, targets) + r
         elif self.loss_function == "MSE":
-            return mse(outputs, targets)
+            return mse(outputs, targets) + r
         elif self.loss_function == "difference":
-            return difference(outputs, targets)
-        else:
-            print("ERROR no loss function")
+            return difference(outputs, targets) + r
+    """
 
     def d_loss_fun(self, outputs, targets):
         if self.loss_function == "cross_entropy_loss":
@@ -93,10 +105,25 @@ class Layer:
 
     def update(self, learning_rate):
         if self.softmax * self.output_layer:
-            # No update for softmax layer output layer
+            # No update for the softmax layer output layer
             pass
         else:
-            grad = np.matmul(self.input.T, self.delta) / self.input.shape[0]
+            # regularization
+            dr = 0
+            if self.reg_const != 0:
+                if self.reg == "L1":
+                    temp = self.weights.copy()
+                    temp[temp > 0] = 1
+                    temp[temp < 0] = -1
+                    dr = self.reg_const * temp
+                elif self.reg == "L2":
+                    dr = self.reg_const * self.weights
+            # self.weights += dr
+            # Update weights
+            grad = (
+                np.matmul(self.input.T, self.delta) / self.input.shape[0]
+                + dr / self.input.shape[0]
+            )
             self.weights -= learning_rate * grad
 
     def forward(
@@ -115,14 +142,13 @@ class Layer:
         self.input = X_batch
         self.z = np.matmul(self.input, self.weights)
         self.activations = self.activation_function(self.z)
-        # print(self.actfunc)
         self.d_activations = self.d_activation_function(self.z)
 
         if prediction:
             return self.activations
 
         if self.output_layer:
-            self.error = self.loss_fun(self.activations, targets)
+            # self.error = self.loss_fun(self.activations, targets)
             self.d_error = self.d_loss_fun(self.activations, targets)
 
         return self.activations

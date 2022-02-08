@@ -50,13 +50,11 @@ class DataGenerator:
         shape 2 = circle
         shape 3 = triangle
         """
-        # index = np.arange(0, self.size, dtype=int)
         n = self.dim
         shapes = np.random.randint(0, 4, self.size)
 
         for j in range(self.size):
             shape = shapes[j]
-            # shape = 2
             # Make empty array with noise
             # Initialize array
             a = np.zeros(n * n)  # * 255
@@ -111,36 +109,50 @@ class DataGenerator:
                 else:
                     (x1, x2) = np.random.randint(2, n - 2, 2)
                 # Radius
-                max_r = max(min(x1, n - x1, x2, n - x2), 3)
-                r = -1
-                while r <= 0:
-                    r = np.round(np.random.random() * max_r)
+                max_r = min(x1, n - x1, x2, n - x2)
+
+                r = max(np.round(np.random.random() * max_r), 2)
                 # Create index arrays to a
                 I, J = np.meshgrid(np.arange(a.shape[0]), np.arange(a.shape[1]))
 
                 # calculate distance of all points to centre
                 dist = np.round(np.sqrt((I - x1) ** 2 + (J - x2) ** 2))
 
-                # Less square?
-                # dist[:, x1] += -1
-                # dist[x2, :] += -1
-
                 a[np.where(dist == r)] = +1
 
             elif shape == 3:
-                # Three defining points
+
+                # make new circle without noise
+                zero = np.zeros_like(a)
                 if self.center:
-                    x1 = np.random.randint(0, (n - 1) // 3, (2, 1))
-                    x2 = np.random.randint((n - 1) // 3, 2 * (n - 1) // 3, (2, 1))
-                    x3 = np.random.randint(2 * (n - 1) // 3, n - 1, (2, 1))
-                    # TODO
-                    x3[0, 0] = x1[0, 0]
-                    x = np.c_[x1, x2, x3]
-
+                    (x1, x2) = ((n - 1) // 2, (n - 1) // 2)
                 else:
-                    x = np.random.randint(0, n - 1, (2, 3))
+                    (x1, x2) = np.random.randint(2, n - 2, 2)
+                # Radius
+                max_r = min(x1, n - x1, x2, n - x2)
 
-                mat0 = -a.copy() * 10
+                r = max(np.round(np.random.random() * max_r), 2)
+                # Create index arrays to a
+                I, J = np.meshgrid(np.arange(zero.shape[0]), np.arange(zero.shape[1]))
+
+                # calculate distance of all points to centre
+                dist = np.round(np.sqrt((I - x1) ** 2 + (J - x2) ** 2))
+                zero[np.where(dist == r)] = +1
+                # Now we pick three points on circle, that defines the triangle
+                zero = np.reshape(zero, (zero.shape[0] ** 2, 1))
+                # Make array for index
+                arang = np.arange(0, zero.shape[0])
+                index_array = zero * arang
+                # Pick three points at random, they define points in R^2
+                (x1, x2, x3) = np.random.choice(
+                    index_array[index_array > 0], 3, replace=False
+                )
+                x1 = np.array([x1 // n, x1 % n])
+                x2 = np.array([x2 // n, x2 % n])
+                x3 = np.array([x3 // n, x3 % n])
+                x = np.c_[x1, x2, x3].astype(int)
+                # Draw lines
+                mat0 = -a.copy()
                 for i in combinations([0, 1, 2], 2):
                     # Initialize matrix
                     mat = mat0
@@ -155,13 +167,13 @@ class DataGenerator:
                         if abs(x1 - x0) < abs(y1 - y0):
                             mat = mat.T
                             x0, y0, x1, y1 = y0, x0, y1, x1
-                        # Swap line direction to go left-to-right if necessary
+                        # Swap line direction if necessary
                         if x0 > x1:
                             x0, y0, x1, y1 = x1, y1, x0, y0
                         # Endpoints
                         mat[x0, y0] = 1
                         mat[x1, y1] = 1
-                        # Draw line inbetween
+                        # Find indexes that should be 1
                         cx = np.arange(x0 + 1, x1)
                         cy = np.round(((y1 - y0) / (x1 - x0)) * (cx - x0) + y0).astype(
                             cx.dtype
@@ -169,12 +181,10 @@ class DataGenerator:
                         # Write intermediate coordinates
                         mat[cx, cy] += 1
                         a += mat0.copy()  # .copy()
-                # Erase points that are noise
-                a[np.where(a < 0)] = 0
+                        a[np.where(a > 1)] = 1
+            # Erase points that are noise i.e -1
             a[np.where(a != 0)] = 1
-            # a = np.reshape(a, (n, n))
-            # a[np.where(a < 0)] = 1
-
+            # Add image to self
             self.Xmatrix[j] = a
             self.Y[j] = shape
             self.X[j] = np.reshape(a, (1, n ** 2))
@@ -186,7 +196,7 @@ class DataGenerator:
 if __name__ == "__main__":
     d = {0: "rectangle", 1: "cross", 2: "circle", 3: "triangle"}
     n = 50
-    gen = DataGenerator(n, 500, 10, False)
+    gen = DataGenerator(n, 5000, 5, False)
     gen.generate()
     y = gen.Y
     unique, counts = np.unique(y, return_counts=True)
@@ -196,7 +206,7 @@ if __name__ == "__main__":
     for i in range(10):
         title = d[int(y[i])]
         a = gen.Xmatrix[i]
-        fig.add_subplot(1 + 1 * (i > 4), 5, 1 + (i % 5))
+        fig.add_subplot(2, 5, 1 + i)
         plt.title(title)
         plt.imshow(a, cmap=plt.cm.gray)
     plt.show(block=True)

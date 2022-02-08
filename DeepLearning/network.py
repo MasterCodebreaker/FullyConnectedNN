@@ -27,74 +27,88 @@ class Network:
     def __init__(
         self,
         networkshape: list,
+        reg_const: float = 0,
+        reg: str = "L1",
         softmax: bool = False,
-        actfunc: str = "sigmoid",
         loss_function: str = "cross_entropy_loss",
     ) -> None:
 
-        # Probably move down
-        nhiddenl = len(networkshape) - 1
-        inputdim = networkshape[0]
-        outputdim = networkshape[-1]
-        """
-        assert (
-            nhiddenl <= 4 and nhiddenl > -1
-        ), f"Number of hidden layersmust be between 0 and 5."
-
-        assert (
-            inputdim <= 50 * 50 and inputdim >= 4
-        ), f"The dimension of input vector must be between 10 and 50. "
-        """
+        self.reg_const = reg_const
+        self.reg = reg
         self.end_weights = None
         self.loss_function = loss_function
         self.networkshape = networkshape
-        self.inputdim = inputdim
-        self.outputdim = outputdim
-        self.nhiddenl = nhiddenl
         self.softmax = softmax
         self.layers = []
-        self.actfunc = actfunc
+        self.loss_val_history = []
         # Just to store end weights for fun
         self.endweights = []
 
-        # self.biases = [np.random.randn(y, 1) for y in sizes[1:]]
-
         # Make list of layers
-        for i in range(1, len(self.networkshape) + self.softmax):
-            # print(f"making layer {i}")
-            output_layer = False
-            if i == len(self.networkshape) + self.softmax - 1:
+        counter = 0
+        for k, v in self.networkshape.items():
+            if counter == 0:
+                n_prev_layer = k + 1  # Bias trick
+                counter += 1
+                # We dont want to make the first layer
+                continue
+            if (counter == len(networkshape) - 1) and (not softmax):
+                # Then this is the output layer
                 output_layer = True
-            n_prev_layer = self.networkshape[i - 1] + 1
-            n_this_layer = (
-                self.networkshape[i - self.softmax * output_layer] + 1 - output_layer
-            )  # Bias trick
+                print("Output, no softmax")
+                n_this_layer = k
+            else:
+                output_layer = False
+                n_this_layer = k + 1  # Bias trick
             layer = Layer(
                 softmax=self.softmax,
                 n_prev_layer=n_prev_layer,
                 n_this_layer=n_this_layer,
                 output_layer=output_layer,
                 loss_function=self.loss_function,
-                actfunc=self.actfunc,
+                actfunc=v[0],
+                weight_range=v[1],
+                reg_const=self.reg_const,
+                reg=self.reg,
+            )
+            self.layers.append(layer)
+            n_prev_layer = k + 1
+            counter += 1
+        if self.softmax:
+            # Make another layer for softmax
+            output_layer = True
+            layer = Layer(
+                softmax=self.softmax,
+                n_prev_layer=n_prev_layer,
+                n_this_layer=n_prev_layer,
+                output_layer=output_layer,
+                loss_function=self.loss_function,
+                reg_const=self.reg_const,
+                reg=self.reg,
             )
             self.layers.append(layer)
 
     # Loss loss_function
     def loss_fun(self, outputs, targets) -> float:
-        if self.loss_function == "cross_entropy_loss":
-            return cross_entropy_loss(outputs, targets)
-        elif self.loss_function == "MSE":
-            return mse(outputs, targets)
-        elif self.loss_function == "difference":
-            return difference(outputs, targets)
+        r = 0
+        if self.reg_const != 0:
+            if self.reg == "L1":
+                for layer in self.layers:
+                    r += layer.reg_const * np.einsum("ij ->", np.abs(layer.weights))
+            elif self.reg == "L2":
+                for layer in self.layers:
+                    r += (
+                        layer.reg_const
+                        * np.einsum("ij ->", (1 / 2) * layer.weights ** 2)
+                        * (1 / 2)
+                    )
 
-    def d_loss_fun(self, outputs, targets):
         if self.loss_function == "cross_entropy_loss":
-            return d_cross_entropy_loss(outputs, targets)
+            return cross_entropy_loss(outputs, targets) + r
         elif self.loss_function == "MSE":
-            return d_mse(outputs, targets)
+            return mse(outputs, targets) + r
         elif self.loss_function == "difference":
-            return d_difference(outputs, targets)
+            return difference(outputs, targets) + r
 
     def forward(
         self, X_batch: np.array, targets: np.array, prediction: bool = False
@@ -109,7 +123,6 @@ class Network:
         for m in self.layers:
             # bias trick
             activation = m.forward(activation, targets)
-        # print(activation)
         return activation
 
     # Assume forward is use before backward
@@ -123,8 +136,7 @@ class Network:
     def validation_step(self, X_val, Y_val):
         X_val = np.c_[X_val, np.ones((X_val.shape[0], 1))]
         outputs = self.forward(X_val, Y_val, prediction=True)
-
-        return self.loss_fun(outputs, Y_val)
+        return (self.loss_fun(outputs, Y_val), outputs)
 
     def train_step(self, X_train, Y_train, learning_rate):
         """
@@ -134,7 +146,7 @@ class Network:
         self.backward()
         for layer in self.layers:
             layer.update(learning_rate)
-        return self.loss_fun(outputs, Y_train)
+        return (self.loss_fun(outputs, Y_train), outputs)
 
     def train(
         self,
@@ -146,36 +158,94 @@ class Network:
         Y_train: np.ndarray,
         X_val: np.ndarray,
         Y_val: np.ndarray,
+        early_stop: int = False,
     ) -> None:
         loss_val = []
+        acc_val = []
         loss_train = []
+        acc_train = []
+        Y_batches = []
+        # Init a low value
+        min_val = 1000
+        counter = early_stop
         for i in range(epochs):
             # select minibatch
             for X_batch, Y_batch in iter(
                 batch_loader(X_train, Y_train, batch_size, stochastic=stochastic)
             ):
-                # print(X_batch.shape, "XshapeY", Y_batch.shape)
-                loss_train.append(
-                    self.train_step(
-                        np.c_[X_batch, np.ones((X_batch.shape[0], 1))],
-                        Y_batch,
-                        learning_rate,
-                    )
+                (l_t, a_t) = self.train_step(
+                    np.c_[X_batch, np.ones((X_batch.shape[0], 1))],
+                    Y_batch,
+                    learning_rate,
                 )
-                loss_val.append(self.validation_step(X_val, Y_val))
-        # print(loss)
-        fig = plt.figure(figsize=(10, 10))
-        fig.add_subplot()
-        plt.xlabel("Number of Training Steps")
-        plt.ylabel("Loss")
-        ax = plt.gca()  # Get Current Axis
-        # For better Zoom
-        # ax.set_xlim([xmin, xmax])
-        # ax.set_ylim([0, 5])
+                loss_train.append(l_t)
+                # Make into a function
+                int_pred = np.zeros_like(a_t)
+                int_pred[np.arange(a_t.shape[0]), a_t.argmax(1)] = 1
+                count = np.sum((int_pred == Y_batch).all(1))
+                acc_train.append(count / Y_batch.shape[0])
 
-        plt.plot(np.array(loss_train), color="b", label="Training")
-        plt.plot(np.array(loss_val), color="r", label="Validating")
-        plt.legend(loc="best")
+            (l_v, a_v) = self.validation_step(X_val, Y_val)
+            loss_val.append(l_v)
+            # Early stopping
+            if early_stop:
+                if l_v > min_val:
+                    counter -= 1
+                else:
+                    min_val = l_v
+
+                if counter == 0:
+                    print(
+                        "We did an early stop at epoch ",
+                        i,
+                        "with loss = ",
+                        np.round(l_v, 2),
+                        ".",
+                    )
+                    break
+
+            # self.loss_val_history.append(l_v)
+            # Make into a function TODO
+            int_pred = np.zeros_like(a_v)
+            int_pred[np.arange(a_v.shape[0]), a_v.argmax(1)] = 1
+            count = np.sum((int_pred == Y_val).all(1))
+            acc_val.append(count / Y_val.shape[0])
+            ################################
+        ###Plotting loss, accuracy for val and train###
+        fig, axs = plt.subplots(2)
+        loss_val = np.array(loss_val)
+        loss_train = np.array(loss_train)
+        axs[0].plot(
+            np.arange(0, loss_train.shape[0], 1),
+            np.array(loss_train),
+            color="b",
+            label="Training",
+        )
+        axs[0].plot(
+            np.arange(0, loss_val.shape[0], 1) * (X_train.shape[0] // batch_size),
+            loss_val,
+            color="r",
+            label="Validating",
+        )
+        axs[0].legend(loc="best")
+
+        acc_val = np.array(acc_val)
+        acc_train = np.array(acc_train)
+        # Label for axis
+        axs.flat[0].set(xlabel="Mini-batches", ylabel="Loss")
+        axs.flat[1].set(xlabel="Mini-batches", ylabel="Accuracy")
+
+        axs[1].plot(
+            np.arange(0, acc_train.shape[0], 1), acc_train, color="b", label="Training",
+        )
+        axs[1].plot(
+            np.arange(0, acc_val.shape[0], 1) * (X_train.shape[0] // batch_size),
+            acc_val,
+            color="r",
+            label="Validating",
+        )
+        axs[1].legend(loc="best")
+        fig.tight_layout()
         plt.show()
 
     def getweights(self):
@@ -193,7 +263,7 @@ class Network:
         int_pred[np.arange(outputs.shape[0]), outputs.argmax(1)] = 1
         count = np.sum((int_pred == Y_val).all(1))
         print(
-            f"We have {count} out of {Y_val.shape[0]} correct prediction for val, that is {np.round(count/Y_val.shape[0] *100,2)}% accurate."
+            f"We have {count} out of {Y_val.shape[0]} correct prediction for val, that is, {np.round(count/Y_val.shape[0] *100,2)}% accurate."
         )
 
         # Score training
@@ -203,7 +273,7 @@ class Network:
         int_pred[np.arange(outputs.shape[0]), outputs.argmax(1)] = 1
         count = np.sum((int_pred == Y_train).all(1))
         print(
-            f"We have {count} out of {Y_train.shape[0]} correct prediction for train, that is {np.round(count/Y_train.shape[0] *100,2)}% accurate."
+            f"We have {count} out of {Y_train.shape[0]} correct prediction for train, that is, {np.round(count/Y_train.shape[0] *100,2)}% accurate."
         )
 
         # Score training
@@ -213,7 +283,7 @@ class Network:
         int_pred[np.arange(outputs.shape[0]), outputs.argmax(1)] = 1
         count = np.sum((int_pred == Y_test).all(1))
         print(
-            f"We have {count} out of {Y_test.shape[0]} correct prediction for X_test, that is {np.round(count/Y_test.shape[0] *100,2)}% accurate."
+            f"We have {count} out of {Y_test.shape[0]} correct prediction for X_test, that is, {np.round(count/Y_test.shape[0] *100,2)}% accurate."
         )
 
         return outputs.round(1)

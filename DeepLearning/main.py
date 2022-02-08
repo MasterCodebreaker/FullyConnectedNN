@@ -9,25 +9,25 @@ parser = ConfigParser()
 
 # Dimension of picture
 
-# Set parameters
-parser.read("globals.ini")
+# Set parameters input your config file
+parser.read("tryforearly.ini")
 # Data parameters
 dimension = parser.getint("datagenerator", "dimension")
 size = parser.getint("datagenerator", "size")
 noise = parser.getint("datagenerator", "noise")
 center = parser.getboolean("datagenerator", "center")
-# Network parameters
+# Networkout parameters
 loss_function = parser.get("network", "loss_function")
 learning_rate = parser.getfloat("network", "learning_rate")
 softmax = parser.getboolean("network", "softmax")
-actfunc = parser.get("network", "actfunc")
 networkshape = eval(parser.get("network", "networkshape"))
+reg = parser.get("network", "reg")
+reg_const = parser.getfloat("network", "reg_const")
 # Training variables
 epochs = parser.getint("training", "epochs")
 batch_size = parser.getint("training", "batch_size")
 stochastic = parser.getboolean("training", "stochastic")
-
-print(loss_function)
+early_stop = parser.getint("training", "early_stop")
 
 if __name__ == "__main__":
     data = DataGenerator(dimension=dimension, size=size, noise=noise, center=center)
@@ -42,13 +42,14 @@ if __name__ == "__main__":
         f"Generating Data\nTraining data X = {X_train.shape}, Y = {Y_train.shape} \nValidating data X = {X_val.shape}, Y = {Y_val.shape}."
     )
     print(
-        f"Making network: networkshape = {networkshape}, softmax = {softmax}, actfunc = {actfunc}, loss_function = {loss_function}."
+        f"Making network: networkshape = {networkshape}\nsoftmax = {softmax}, loss_function = {loss_function}, regularization = {reg} with lamda = {reg_const}."
     )
     net = Network(
         networkshape=networkshape,
         softmax=softmax,
-        actfunc=actfunc,
         loss_function=loss_function,
+        reg_const=reg_const,
+        reg=reg,
     )
     # Train it
     print(
@@ -63,17 +64,19 @@ if __name__ == "__main__":
         Y_train=Y_train,
         X_val=X_val,
         Y_val=Y_val,
+        early_stop=early_stop,
     )
     print(
         "Example prediction",
         net.predict(X_val, Y_val, X_train, Y_train, X_test, Y_test)[0],
     )
     # Plot some random images:
-    d = {0: "rectangle", 1: "cross", 2: "circle", 3: "triangle"}
+    d = {0: "# rectangles", 1: "# cross", 2: "# circles", 3: "# triangles"}
     Y = data.Y
     unique, counts = np.unique(Y, return_counts=True)
     print(dict(zip(d.values(), counts)))
     # Plotter
+    """
     NUMBER_OF_INTS = 10
     fig = plt.figure(figsize=(15, 10))
     randomints = np.random.randint(0, Y.shape[0], size=NUMBER_OF_INTS)
@@ -85,3 +88,4 @@ if __name__ == "__main__":
         plt.title(title)
         plt.imshow(matrix, cmap=plt.cm.gray)
     plt.show(block=True)
+    """
