@@ -1,31 +1,52 @@
 from configparser import ConfigParser
 
+"""
+Make your own config file.
+"""
 config = ConfigParser()
 N = 30
+GLOBAL_LEARNING_RATE = 0.8
 # DataGenerator variables
-config["datagenerator"] = {"noise": 10, "size": 5000, "dimension": N, "center": False}
+config["datagenerator"] = {
+    "noise": 5,
+    "size": 2000,
+    "dimension": N,
+    "center": True,
+    "training": 0.7,
+    "validating": 0.2,
+}
 # Network variables
+"""
+Possible loss functions are:
+"MSE" --  "cross_entropy_loss"
+Possible activation functions are:
+"ReLU"  -- "sigmoid" -- "identity" aka linear -- "tanh"  --  "softmax"
+Possible regularization are:
+"L1" -- "L2"
+"none" To use none or set "reg_const" to 0.
+"""
 config["network"] = {
-    "loss_function": "cross_entropy_loss",
-    "learning_rate": 100,
+    "which_loss_function": "cross_entropy_loss",
     "softmax": True,
     "networkshape": {
-        N ** 2: "No input",
-        50: ("ReLU", (-1, 1)),
-        32: ("sigmoid", (-0.5, 0.5)),
-        16: ("ReLU", (-1, 1)),
-        8: ("ReLU", (-1, 1)),
-        4: ("sigmoid", (-0.5, 0.5)),
+        N ** 2: ("Initialize_weights", "learning_rate"),  # Input layer
+        64: ("ReLU", (-1, 1), GLOBAL_LEARNING_RATE * 100),
+        32: ("tanh", (-0.8, 0.8), GLOBAL_LEARNING_RATE * 10),
+        16: ("ReLU", (-0.8, 0.8), GLOBAL_LEARNING_RATE * 10),
+        10: ("ReLU", (-0.8, 0.8), GLOBAL_LEARNING_RATE),
+        8: ("sigmoid", (-0.8, 0.8), GLOBAL_LEARNING_RATE),
+        4: ("sigmoid", (-0.8, 0.8), GLOBAL_LEARNING_RATE),  # Output layer
     },
     "reg": "L2",
-    "reg_const": 0.001,
+    "reg_const": 0.0001,
 }
 # Training variables
 config["training"] = {
-    "epochs": 100,
-    "batch_size": 10,
+    "epochs": 25,
+    "batch_size": 12,
     "stochastic": True,
-    "early_stop": 30,
+    # 0 for no early stop, otherwise specify epoch
+    "early_stop": 0,
 }
-with open("./tryforearly.ini", "w") as f:
+with open("./configfile3.ini", "w") as f:
     config.write(f)
