@@ -55,7 +55,7 @@ if __name__ == "__main__":
     layer_counter = 0
     for k, v in networkshape.items():
         if v[0] == "Initialize_weights":
-            init_dim = v[0]  # Store if we want to visualize the weights
+            init_dim = k  # Store if we want to visualize the weights
             print(f"Input layer with {k} nodes.")
             continue
         layer_counter += 1
@@ -124,8 +124,9 @@ if __name__ == "__main__":
     """
     # Bonus if you want to print weights, only works for two (one) layer network
     net.getweights()
+    init_dim = int(np.sqrt(init_dim))
     gg = net.endweights[0]
-    ggt = gg[:-1, 1]  # Second index represents which shape you want
+    ggt = gg[:-1, 2]  # Second index represents which shape you want
     ggt = ggt * (1 / np.max(ggt))  # Normalize, did not make a huge difference
     ggt = np.reshape(ggt, (init_dim, init_dim))
     fig = plt.figure(figsize=(15, 10))

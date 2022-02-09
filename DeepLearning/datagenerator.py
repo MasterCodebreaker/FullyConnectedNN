@@ -208,8 +208,8 @@ class DataGenerator:
 
 if __name__ == "__main__":
     d = {0: "rectangle", 1: "cross", 2: "circle", 3: "triangle"}
-    n = 50
-    gen = DataGenerator(dimension=n, size=10, noise=0, center=True)
+    n = 20
+    gen = DataGenerator(dimension=n, size=10, noise=0, center=False)
     gen.generate()
     y = gen.Y
     unique, counts = np.unique(y, return_counts=True)

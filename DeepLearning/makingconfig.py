@@ -5,10 +5,10 @@ Make your own config file.
 """
 config = ConfigParser()
 N = 30
-GLOBAL_LEARNING_RATE = 0.8
+GLOBAL_LEARNING_RATE = 10
 # DataGenerator variables
 config["datagenerator"] = {
-    "noise": 5,
+    "noise": 0,
     "size": 2000,
     "dimension": N,
     "center": True,
@@ -42,11 +42,11 @@ config["network"] = {
 }
 # Training variables
 config["training"] = {
-    "epochs": 25,
+    "epochs": 60,
     "batch_size": 12,
     "stochastic": True,
     # 0 for no early stop, otherwise specify epoch
     "early_stop": 0,
 }
-with open("./configfile3.ini", "w") as f:
+with open("./configfile4.ini", "w") as f:
     config.write(f)
